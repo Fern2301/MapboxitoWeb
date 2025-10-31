@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MapBoxito</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.2/mapbox-gl.css' rel='stylesheet' />
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Map Box  Tracker</h1>
+            <div class="status">
+                <span id="status">Espere...</span>
+                <span id="lastUpdate"></span>
+            </div>
+        </header>
+
+        <div class="map-container">
+            <div id="map">
+                <div id="mapLoading">Cargando mapa...</div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-card">
+                <h3>Informacion del Dispositivo</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Dispositivo:</label>
+                        <span id="deviceId">Id del dispositivo</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Latitud:</label>
+                        <span id="lat">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Longitud:</label>
+                        <span id="lng">-</span>
+                    </div>                    
+                    <div class="info-item">
+                        <label>Hora:</label>
+                        <span id="time">-</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Estado:</label>
+                        <span id="onlineStatus">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
