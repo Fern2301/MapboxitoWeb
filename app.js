@@ -194,7 +194,7 @@ function updateLastUpdateTime() {
     const timeString = now.toLocaleTimeString('es-ES');
     const lastUpdateElement = document.getElementById('lastUpdate');
     if (lastUpdateElement) {
-        lastUpdateElement.textContent = `Última verificación: ${timeString}`;
+        lastUpdateElement.textContent = `Hora: ${timeString}`;
     }
 }
 
