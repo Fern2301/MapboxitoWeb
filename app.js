@@ -1,6 +1,6 @@
-const firebaseConfig = {
+const configuracionFirebase = {
     apiKey: "AIzaSyCD8Sg4hUzv4rLCnnxEyNZ2WTeOh_Hw5hU",
-    authDomain: "mapbox-tracker.firebaseapp.com",
+    authDomain: "mapbox-tracker.firebasestorage.app",
     projectId: "mapbox-tracker",
     storageBucket: "mapbox-tracker.firebasestorage.app",
     messagingSenderId: "1058456217783",
@@ -10,174 +10,160 @@ const firebaseConfig = {
 
 mapboxgl.accessToken = 'pk.eyJ1IjoibG92ZXN0ZWluIiwiYSI6ImNtZzA5Y2x0ODBiMWMybW9qY2E3ZWZpNG4ifQ.aFusWwvnRW8XxzgtGFtMUw';
 
-let map;
-let marker;
-let geofences = [];
-let geofenceLayers = [];
-let geofenceSources = [];
-let currentGeofence = null;
-const DEVICE_ID = "Fernandito";
-let lastLocation = null;
-let geofencesInterval = null;
+let mapa;
+let marcador;
+let geocercas = [];
+let capasGeocercas = [];
+let fuentesGeocercas = [];
+let geocercaActual = null;
+const ID_DISPOSITIVO = "Fernandito";
+let ultimaUbicacion = null;
+let intervaloGeocercas = null;
 
-// Función para extraer el color RGB de un color ARGB
-function getRgbColor(argbColor) {
-    if (!argbColor || !argbColor.startsWith('#')) {
-        return argbColor || '#FF0000'; // Color rojo por defecto
+function obtenerColorRGB(colorARGB) {
+    if (!colorARGB || !colorARGB.startsWith('#')) {
+        return colorARGB || '#FF0000';
+    }    
+    if (colorARGB.length === 7) {
+        return colorARGB;
     }
     
-    // Si el color ya es RGB (6 caracteres), devolverlo tal cual
-    if (argbColor.length === 7) {
-        return argbColor;
+    if (colorARGB.length === 9) {
+        return `#${colorARGB.substring(3, 9)}`;
+    } else if (colorARGB.length === 8) {
+        return `#${colorARGB.substring(1, 7)}`;
     }
     
-    // Si es ARGB (8 o 9 caracteres con #), extraer RGB
-    if (argbColor.length === 9) {
-        // Formato #AARRGGBB -> extraer #RRGGBB
-        return `#${argbColor.substring(3, 9)}`;
-    } else if (argbColor.length === 8) {
-        // Formato #RRGGBBAA -> extraer #RRGGBB
-        return `#${argbColor.substring(1, 7)}`;
-    }
-    
-    return '#FF0000'; // Color rojo por defecto si el formato no es reconocido
+    return '#FF0000';
 }
 
-// Función para extraer la opacidad de un color ARGB
-function getOpacityFromArgb(argbColor) {
-    if (!argbColor || !argbColor.startsWith('#')) {
-        return 0.5; // Opacidad media por defecto
+function obtenerOpacidadDeColor(colorARGB) {
+    if (!colorARGB || !colorARGB.startsWith('#')) {
+        return 0.5; 
     }
-    
-    // Si el color ya es RGB (6 caracteres), opacidad completa
-    if (argbColor.length === 7) {
+        
+    if (colorARGB.length === 7) {
         return 1.0;
     }
     
-    let alphaHex = '';
+    let alfaHex = '';
     
-    if (argbColor.length === 9) {
-        // Formato #AARRGGBB -> alpha está en las posiciones 1-2
-        alphaHex = argbColor.substring(1, 3);
-    } else if (argbColor.length === 8) {
-        // Formato #RRGGBBAA -> alpha está en las posiciones 7-8
-        alphaHex = argbColor.substring(6, 8);
+    if (colorARGB.length === 9) {
+        alfaHex = colorARGB.substring(1, 3);
+    } else if (colorARGB.length === 8) {        
+        alfaHex = colorARGB.substring(6, 8);
     } else {
         return 0.5;
     }
     
-    try {
-        // Convertir hex a decimal (0-255) y luego a fracción (0.0-1.0)
-        const alphaInt = parseInt(alphaHex, 16);
-        return alphaInt / 255;
+    try {        
+        const alfaInt = parseInt(alfaHex, 16);
+        return alfaInt / 255;
     } catch (error) {
-        return 0.5; // Opacidad media por defecto si hay error
+        return 0.5;
     }
 }
 
-function init() {    
-    initializeFirebase();
-    setupEventListeners();
+function iniciar() {    
+    inicializarFirebase();
+    configurarEventos();
 }
 
-function updateStatus(message, type = '') {
-    const statusElement = document.getElementById('status');
-    if (statusElement) {
-        statusElement.textContent = message;
-        statusElement.className = type;
+function cambiarEstado(mensaje, tipo = '') {
+    const elementoEstado = document.getElementById('status');
+    if (elementoEstado) {
+        elementoEstado.textContent = mensaje;
+        elementoEstado.className = tipo;
     }
-    console.log('Status:', message);
+    console.log('Estado:', mensaje);
 }
 
-function setupEventListeners() {
-    // Solo el botón para centrar el mapa
-    document.getElementById('btnCenterMap').addEventListener('click', centerMapOnLocation);
+function configurarEventos() {
+    document.getElementById('btnCenterMap').addEventListener('click', centrarMapaEnUbicacion);
 }
 
-function initializeFirebase() {
+function inicializarFirebase() {
     try {
-        firebase.initializeApp(firebaseConfig);        
-        initializeMap();
+        firebase.initializeApp(configuracionFirebase);        
+        inicializarMapa();
     } catch (error) {
         console.error('Error Firebase:', error);
-        updateStatus('Error conectando a Firebase', 'error');
+        cambiarEstado('Error conectando a Firebase', 'error');
     }
 }
 
-function initializeMap() {
-    map = new mapboxgl.Map({
+function inicializarMapa() {
+    mapa = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/streets-v12',
         center: [-68.1193, -16.4897],
         zoom: 12
     });
 
-    map.addControl(new mapboxgl.NavigationControl());
+    mapa.addControl(new mapboxgl.NavigationControl());
     
-    map.on('load', () => {        
-        const mapLoading = document.getElementById('mapLoading');
-        if (mapLoading) {
-            mapLoading.style.display = 'none';
-        }        
+    mapa.on('load', () => {        
+        const cargandoMapa = document.getElementById('mapLoading');
+        if (cargandoMapa) {
+            cargandoMapa.style.display = 'none';
+        }
         console.log('Mapa cargado correctamente');
-        loadGeofencesFromFirebase();
-        startListening();
+        cargarGeocercasDeFirebase();
+        comenzarEscucha();
     });
 
-    map.on('error', (e) => {
+    mapa.on('error', (e) => {
         console.error('Error del mapa:', e);
-        updateStatus('Error cargando el mapa', 'error');
+        cambiarEstado('Error cargando el mapa', 'error');
     });
 }
 
-// Cargar geocercas desde Firebase
-function loadGeofencesFromFirebase() {
-    const db = firebase.firestore();
+function cargarGeocercasDeFirebase() {
+    const baseDatos = firebase.firestore();
     
-    db.collection('geocercas')
-        .where('deviceId', '==', DEVICE_ID)
+    baseDatos.collection('geocercas')
+        .where('deviceId', '==', ID_DISPOSITIVO)
         .get()
         .then((snapshot) => {
             console.log('Geocercas recibidas:', snapshot.size);
             
             if (!snapshot.empty) {
-                geofences = [];
+                geocercas = [];
                 
                 snapshot.forEach((doc) => {
                     try {
-                        const data = doc.data();
-                        const id = data.id || doc.id;
-                        const name = data.name || 'Geocerca sin nombre';
-                        const fillColor = data.fillColor || '#4000ff00';
-                        const pointsData = data.points || [];
+                        const datos = doc.data();
+                        const id = datos.id || doc.id;
+                        const nombre = datos.name || 'Geocerca sin nombre';
+                        const colorRelleno = datos.fillColor || '#4000ff00';
+                        const puntosDatos = datos.points || [];
                         
-                        const points = pointsData.map(point => ({
-                            latitude: point.latitude || 0,
-                            longitude: point.longitude || 0
+                        const puntos = puntosDatos.map(punto => ({
+                            latitude: punto.latitude || 0,
+                            longitude: punto.longitude || 0
                         }));
                         
-                        if (points.length > 0) {
-                            const geofence = {
+                        if (puntos.length > 0) {
+                            const geocerca = {
                                 id: id,
-                                name: name,
-                                points: points,
-                                fillColor: fillColor
+                                nombre: nombre,
+                                puntos: puntos,
+                                colorRelleno: colorRelleno
                             };
-                            geofences.push(geofence);
-                            console.log('Geocerca cargada:', name, 'con', points.length, 'puntos');
+                            geocercas.push(geocerca);
+                            console.log('Geocerca cargada:', nombre, 'con', puntos.length, 'puntos');
                         }
                     } catch (e) {
                         console.error('Error parseando geocerca:', e);
                     }
                 });
                 
-                drawGeofencesOnMap();
-                updateGeofenceCount();
+                dibujarGeocercasEnMapa();
+                actualizarContadorGeocercas();
                 
-                // Mostrar notificación de geocercas cargadas
-                if (geofences.length > 0) {
+                if (geocercas.length > 0) {
                     Toastify({
-                        text: `${geofences.length} geocercas cargadas`,
+                        text: `${geocercas.length} geocercas cargadas`,
                         duration: 3000,
                         gravity: "top",
                         position: "right"
@@ -192,224 +178,192 @@ function loadGeofencesFromFirebase() {
         });
 }
 
-// Eliminar geocercas existentes del mapa
-function removeExistingGeofences() {
-    // Eliminar capas
-    geofenceLayers.forEach(layerId => {
-        if (map.getLayer(layerId)) {
-            map.removeLayer(layerId);
-            console.log('Capa eliminada:', layerId);
+function eliminarGeocercasExistentes() {
+    capasGeocercas.forEach(idCapa => {
+        if (mapa.getLayer(idCapa)) {
+            mapa.removeLayer(idCapa);
+            console.log('Capa eliminada:', idCapa);
+        }
+    });
+        
+    fuentesGeocercas.forEach(idFuente => {
+        if (mapa.getSource(idFuente)) {
+            mapa.removeSource(idFuente);
+            console.log('Fuente eliminada:', idFuente);
         }
     });
     
-    // Eliminar fuentes
-    geofenceSources.forEach(sourceId => {
-        if (map.getSource(sourceId)) {
-            map.removeSource(sourceId);
-            console.log('Fuente eliminada:', sourceId);
-        }
-    });
-    
-    // Limpiar arrays
-    geofenceLayers = [];
-    geofenceSources = [];
+    capasGeocercas = [];
+    fuentesGeocercas = [];
 }
 
-// Dibujar geocercas en el mapa
-function drawGeofencesOnMap() {
-    // Verificar si el mapa está cargado
-    if (!map || !map.isStyleLoaded()) {
+function dibujarGeocercasEnMapa() {
+    if (!mapa || !mapa.isStyleLoaded()) {
         console.log('El mapa no está completamente cargado, esperando...');
-        setTimeout(drawGeofencesOnMap, 100);
+        setTimeout(dibujarGeocercasEnMapa, 100);
         return;
     }
+    eliminarGeocercasExistentes();
     
-    // Eliminar geocercas existentes
-    removeExistingGeofences();
+    console.log('Dibujando', geocercas.length, 'geocercas...');
     
-    console.log('Dibujando', geofences.length, 'geocercas...');
-    
-    geofences.forEach((geofence, index) => {
+    geocercas.forEach((geocerca, indice) => {
         try {
-            // Crear array de coordenadas para el polígono
-            const coordinates = geofence.points.map(point => [point.longitude, point.latitude]);
+            const coordenadas = geocerca.puntos.map(punto => [punto.longitude, punto.latitude]);
             
-            // Asegurar que el polígono esté cerrado
-            if (coordinates.length > 0 && coordinates.length >= 3) {
-                coordinates.push(coordinates[0]);
+            if (coordenadas.length > 0 && coordenadas.length >= 3) {
+                coordenadas.push(coordenadas[0]);
             } else {
-                console.warn(`Geocerca "${geofence.name}" no tiene suficientes puntos: ${coordinates.length}`);
+                console.warn(`Geocerca "${geocerca.nombre}" no tiene suficientes puntos: ${coordenadas.length}`);
                 return;
             }
             
-            // Extraer color RGB y opacidad del color ARGB
-            const rgbColor = getRgbColor(geofence.fillColor);
-            const opacity = getOpacityFromArgb(geofence.fillColor);
+            const colorRGB = obtenerColorRGB(geocerca.colorRelleno);
+            const opacidad = obtenerOpacidadDeColor(geocerca.colorRelleno);
             
-            const sourceId = `geofence-${geofence.id}-${Date.now()}`; // Añadir timestamp para IDs únicos
-            const fillLayerId = `geofence-fill-${geofence.id}-${Date.now()}`;
-            const borderLayerId = `geofence-border-${geofence.id}-${Date.now()}`;
-            
-            // Verificar si ya existe una fuente con este ID
-            if (map.getSource(sourceId)) {
-                console.log(`Fuente ${sourceId} ya existe, eliminando...`);
-                map.removeSource(sourceId);
+            const idFuente = `geofence-${geocerca.id}-${Date.now()}`;
+            const idCapaRelleno = `geofence-fill-${geocerca.id}-${Date.now()}`;
+            const idCapaBorde = `geofence-border-${geocerca.id}-${Date.now()}`;
+                        
+            if (mapa.getSource(idFuente)) {
+                console.log(`Fuente ${idFuente} ya existe, eliminando...`);
+                mapa.removeSource(idFuente);
             }
             
-            // Crear el GeoJSON feature
-            const geojsonFeature = {
+            const caracteristicaGeoJSON = {
                 'type': 'Feature',
                 'geometry': {
                     'type': 'Polygon',
-                    'coordinates': [coordinates]
+                    'coordinates': [coordenadas]
                 },
                 'properties': {
-                    'name': geofence.name,
-                    'id': geofence.id
+                    'nombre': geocerca.nombre,
+                    'id': geocerca.id
                 }
             };
             
-            // Añadir fuente GeoJSON
-            map.addSource(sourceId, {
+            mapa.addSource(idFuente, {
                 'type': 'geojson',
-                'data': geojsonFeature
+                'data': caracteristicaGeoJSON
             });
             
-            // Añadir capa de relleno - VISIBLE DESDE EL INICIO
-            map.addLayer({
-                'id': fillLayerId,
+            mapa.addLayer({
+                'id': idCapaRelleno,
                 'type': 'fill',
-                'source': sourceId,
+                'source': idFuente,
                 'layout': {},
                 'paint': {
-                    'fill-color': rgbColor,  // Solo color RGB
-                    'fill-opacity': opacity  // Opacidad separada
+                    'fill-color': colorRGB,
+                    'fill-opacity': opacidad
                 }
             });
             
-            // Añadir capa de borde - VISIBLE DESDE EL INICIO
-            map.addLayer({
-                'id': borderLayerId,
+            mapa.addLayer({
+                'id': idCapaBorde,
                 'type': 'line',
-                'source': sourceId,
+                'source': idFuente,
                 'layout': {},
                 'paint': {
-                    'line-color': rgbColor,  // Solo color RGB para borde
+                    'line-color': colorRGB,
                     'line-width': 2,
-                    'line-opacity': 0.8  // Bordes más opacos
+                    'line-opacity': 0.8
                 }
             });
             
-            // Guardar IDs de capas y fuentes
-            geofenceSources.push(sourceId);
-            geofenceLayers.push(fillLayerId, borderLayerId);
+            fuentesGeocercas.push(idFuente);
+            capasGeocercas.push(idCapaRelleno, idCapaBorde);
             
-            console.log(`Geocerca "${geofence.name}" dibujada con ${coordinates.length - 1} puntos`);
-            console.log(`Color: ${rgbColor}, Opacidad: ${opacity}`);
+            console.log(`Geocerca "${geocerca.nombre}" dibujada con ${coordenadas.length - 1} puntos`);
+            console.log(`Color: ${colorRGB}, Opacidad: ${opacidad}`);
             
-            // Añadir interacciones para esta geocerca
-            addGeofenceInteraction(fillLayerId, geofence);
+            agregarInteraccionGeocerca(idCapaRelleno, geocerca);
             
         } catch (error) {
-            console.error(`Error dibujando geocerca "${geofence.name}":`, error);
+            console.error(`Error dibujando geocerca "${geocerca.nombre}":`, error);
             console.error('Detalles del error:', error.message);
         }
     });
     
-    console.log('Total geocercas dibujadas:', geofences.length);
+    console.log('Total geocercas dibujadas:', geocercas.length);
 }
 
-// Añadir interacción a una geocerca específica
-function addGeofenceInteraction(layerId, geofence) {
-    // Esperar un momento para asegurar que la capa esté cargada
+function agregarInteraccionGeocerca(idCapa, geocerca) {
     setTimeout(() => {
-        if (!map.getLayer(layerId)) {
-            console.log(`Capa ${layerId} no encontrada para eventos`);
+        if (!mapa.getLayer(idCapa)) {
+            console.log(`Capa ${idCapa} no encontrada para eventos`);
             return;
         }
         
-        // Cambiar cursor al pasar sobre la geocerca
-        map.on('mouseenter', layerId, () => {
-            map.getCanvas().style.cursor = 'pointer';
-            // Cambiar opacidad al pasar el mouse
-            map.setPaintProperty(layerId, 'fill-opacity', 0.7);
+        mapa.on('mouseenter', idCapa, () => {
+            mapa.getCanvas().style.cursor = 'pointer';
+            mapa.setPaintProperty(idCapa, 'fill-opacity', 0.7);
         });
         
-        map.on('mouseleave', layerId, () => {
-            map.getCanvas().style.cursor = '';
-            // Restaurar opacidad
-            const originalOpacity = getOpacityFromArgb(geofence.fillColor);
-            map.setPaintProperty(layerId, 'fill-opacity', originalOpacity);
+        mapa.on('mouseleave', idCapa, () => {
+            mapa.getCanvas().style.cursor = '';
+            const opacidadOriginal = obtenerOpacidadDeColor(geocerca.colorRelleno);
+            mapa.setPaintProperty(idCapa, 'fill-opacity', opacidadOriginal);
         });
         
-        // Mostrar popup al hacer clic
-        map.on('click', layerId, (e) => {
-            const coordinates = e.lngLat;
+        mapa.on('click', idCapa, (e) => {
+            const coordenadas = e.lngLat;
             
             new mapboxgl.Popup()
-                .setLngLat(coordinates)
+                .setLngLat(coordenadas)
                 .setHTML(`
                     <div style="padding: 10px; max-width: 250px;">
-                        <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">${geofence.name}</h3>
-                        <p style="margin: 5px 0; font-size: 14px;"><strong>ID:</strong> ${geofence.id}</p>
-                        <p style="margin: 5px 0; font-size: 14px;"><strong>Puntos:</strong> ${geofence.points.length}</p>
-                        <p style="margin: 5px 0; font-size: 14px;">
-                            <strong>Color:</strong> 
-                            <span style="display: inline-block; width: 20px; height: 20px; background-color: ${getRgbColor(geofence.fillColor)}; margin-left: 8px; border: 1px solid #ccc; border-radius: 3px; vertical-align: middle;"></span>
-                        </p>
+                        <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">${geocerca.nombre}</h3>
+                        <p style="margin: 5px 0; font-size: 14px;"><strong>ID:</strong> ${geocerca.id}</p>
+                        <p style="margin: 5px 0; font-size: 14px;"><strong>Puntos:</strong> ${geocerca.puntos.length}</p>                        
                     </div>
                 `)
-                .addTo(map);
+                .addTo(mapa);
         });
     }, 200);
 }
 
-// Verificar si un punto está dentro de una geocerca
-function checkPointInGeofence(point, geofence) {
-    const x = point.lng;
-    const y = point.lat;
+function verificarPuntoEnGeocerca(punto, geocerca) {
+    const x = punto.lng;
+    const y = punto.lat;
     
-    const polygon = geofence.points.map(p => [p.longitude, p.latitude]);
-    let inside = false;
+    const poligono = geocerca.puntos.map(p => [p.longitude, p.latitude]);
+    let dentro = false;
     
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
+    for (let i = 0, j = poligono.length - 1; i < poligono.length; j = i++) {
+        const xi = poligono[i][0], yi = poligono[i][1];
+        const xj = poligono[j][0], yj = poligono[j][1];
         
-        const intersect = ((yi > y) !== (yj > y)) &&
+        const intersecta = ((yi > y) !== (yj > y)) &&
             (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
         
-        if (intersect) inside = !inside;
+        if (intersecta) dentro = !dentro;
     }
     
-    return inside;
+    return dentro;
 }
 
-// Verificar todas las geocercas
-function checkGeofences(location) {
-    for (const geofence of geofences) {
-        if (checkPointInGeofence(location, geofence)) {
-            return geofence;
+function verificarGeocercas(ubicacion) {
+    for (const geocerca of geocercas) {
+        if (verificarPuntoEnGeocerca(ubicacion, geocerca)) {
+            return geocerca;
         }
     }
     return null;
 }
 
-// Actualizar estado de geocerca en la UI
-function updateGeofenceStatus(geofenceFound, location) {
-    const geofenceStatusElement = document.getElementById('geofenceStatus');
-    const currentGeofenceElement = document.getElementById('currentGeofence');
+function actualizarEstadoGeocerca(geocercaEncontrada, ubicacion) {
+    const elementoEstadoGeocerca = document.getElementById('geofenceStatus');
+    const elementoGeocercaActual = document.getElementById('currentGeofence');
     
-    if (geofenceFound) {
-        if (currentGeofence !== geofenceFound) {
-            geofenceStatusElement.textContent = `DENTRO: ${geofenceFound.name}`;
-            geofenceStatusElement.className = 'inside';
-            currentGeofenceElement.textContent = geofenceFound.name;
-            currentGeofence = geofenceFound;
+    if (geocercaEncontrada) {
+        if (geocercaActual !== geocercaEncontrada) {
+            elementoEstadoGeocerca.textContent = `DENTRO: ${geocercaEncontrada.nombre}`;
+            elementoEstadoGeocerca.className = 'inside';
+            elementoGeocercaActual.textContent = geocercaEncontrada.nombre;
+            geocercaActual = geocercaEncontrada;
             
-            // Notificación Toast
             Toastify({
-                text: `Entró en: ${geofenceFound.name}`,
+                text: `Entró en: ${geocercaEncontrada.nombre}`,
                 duration: 5000,
                 gravity: "top",
                 position: "right",
@@ -419,14 +373,13 @@ function updateGeofenceStatus(geofenceFound, location) {
             }).showToast();
         }
     } else {
-        if (currentGeofence !== null) {
-            geofenceStatusElement.textContent = `Salió de: ${currentGeofence.name}`;
-            geofenceStatusElement.className = 'exited';
-            currentGeofenceElement.textContent = 'ninguna';
+        if (geocercaActual !== null) {
+            elementoEstadoGeocerca.textContent = `Salió de: ${geocercaActual.nombre}`;
+            elementoEstadoGeocerca.className = 'exited';
+            elementoGeocercaActual.textContent = 'ninguna';
             
-            // Notificación Toast
             Toastify({
-                text: `Salió de: ${currentGeofence.name}`,
+                text: `Salió de: ${geocercaActual.nombre}`,
                 duration: 5000,
                 gravity: "top",
                 position: "right",
@@ -435,81 +388,75 @@ function updateGeofenceStatus(geofenceFound, location) {
                 }
             }).showToast();
             
-            currentGeofence = null;
+            geocercaActual = null;
         } else {
-            geofenceStatusElement.textContent = 'Fuera de geocercas';
-            geofenceStatusElement.className = 'outside';
-            currentGeofenceElement.textContent = 'ninguna';
+            elementoEstadoGeocerca.textContent = 'Fuera de geocercas';
+            elementoEstadoGeocerca.className = 'outside';
+            elementoGeocercaActual.textContent = 'ninguna';
         }
     }
 }
 
-function startListening() {
-    const db = firebase.firestore();
+function comenzarEscucha() {
+    const baseDatos = firebase.firestore();
     
-    // Escuchar ubicaciones
-    db.collection('ubicacion')
-        .where('deviceId', '==', DEVICE_ID)
+    baseDatos.collection('ubicacion')
+        .where('deviceId', '==', ID_DISPOSITIVO)
         .onSnapshot((snapshot) => {
             console.log('Datos recibidos:', snapshot.size, 'documentos');
             
             if (snapshot.empty) {
-                updateStatus('No hay dispositivos conectados', 'waiting');
+                cambiarEstado('No hay dispositivos conectados', 'waiting');
                 return;
             }
             
-            let latestDoc = null;
-            let latestTime = 0;
+            let documentoReciente = null;
+            let tiempoReciente = 0;
             
             snapshot.forEach((doc) => {
-                const data = doc.data();
-                const updateTime = data.lastUpdate ? data.lastUpdate.toMillis() : 0;
+                const datos = doc.data();
+                const tiempoActualizacion = datos.lastUpdate ? datos.lastUpdate.toMillis() : 0;
                 
-                if (updateTime > latestTime) {
-                    latestTime = updateTime;
-                    latestDoc = data;
+                if (tiempoActualizacion > tiempoReciente) {
+                    tiempoReciente = tiempoActualizacion;
+                    documentoReciente = datos;
                 }
             });
             
-            if (latestDoc) {
-                updateUserLocation(latestDoc);
+            if (documentoReciente) {
+                actualizarUbicacionUsuario(documentoReciente);
             } else {
-                updateStatus('No se pudo procesar los datos', 'error');
+                cambiarEstado('No se pudo procesar los datos', 'error');
             }
             
         }, (error) => {
             console.error('Error Firestore:', error);
-            updateStatus('Error de conexión con Firestore', 'error');
+            cambiarEstado('Error de conexión con Firestore', 'error');
         });
     
-    // Iniciar intervalo para actualizar geocercas cada 5 segundos
-    startGeofencesInterval();
+    comenzarIntervaloGeocercas();
     
-    updateLastUpdateTime();
-    setInterval(updateLastUpdateTime, 1000);
+    actualizarUltimaActualizacion();
+    setInterval(actualizarUltimaActualizacion, 1000);
 }
 
-// Iniciar intervalo para actualizar geocercas
-function startGeofencesInterval() {
-    // Limpiar intervalo anterior si existe
-    if (geofencesInterval) {
-        clearInterval(geofencesInterval);
+function comenzarIntervaloGeocercas() {
+    if (intervaloGeocercas) {
+        clearInterval(intervaloGeocercas);
     }
     
-    // Establecer nuevo intervalo de 5 segundos
-    geofencesInterval = setInterval(() => {
+    intervaloGeocercas = setInterval(() => {
         console.log('Actualizando geocercas...');
-        loadGeofencesFromFirebase();
-    }, 5000); // 5000 ms = 5 segundos
+        cargarGeocercasDeFirebase();
+    }, 5000);
 }
 
-function updateUserLocation(userData) {
-    console.log('Actualizando ubicación:', userData);
+function actualizarUbicacionUsuario(datosUsuario) {
+    console.log('Actualizando ubicación:', datosUsuario);
     
-    const { lat, lng, time, deviceId, isOnline, currentGeofence: dbGeofence } = userData;
-    lastLocation = { lat, lng };
+    const { lat, lng, time, deviceId, isOnline, currentGeofence: geocercaBase } = datosUsuario;
+    ultimaUbicacion = { lat, lng };
     
-    // Actualizar UI
     if (document.getElementById('deviceId')) {
         document.getElementById('deviceId').textContent = deviceId || 'No disponible';
         document.getElementById('lat').textContent = lat ? lat.toFixed(6) : 'No disponible';
@@ -517,43 +464,41 @@ function updateUserLocation(userData) {
         document.getElementById('time').textContent = time || 'No disponible';
         document.getElementById('onlineStatus').textContent = isOnline ? 'En línea' : 'Desconectado';
         document.getElementById('onlineStatus').className = isOnline ? 'online' : 'offline';
-        document.getElementById('currentGeofence').textContent = dbGeofence || 'ninguna';
+        document.getElementById('currentGeofence').textContent = geocercaBase || 'ninguna';
     }
     
     if (!lat || !lng || typeof lat !== 'number' || typeof lng !== 'number') {
         console.log('Coordenadas inválidas:', lat, lng);
-        updateStatus('Coordenadas inválidas recibidas', 'error');
+        cambiarEstado('Coordenadas inválidas recibidas', 'error');
         return;
     }
     
-    const newLocation = [lng, lat];
+    const nuevaUbicacion = [lng, lat];
     
-    // Verificar geocercas
-    const geofenceFound = checkGeofences({ lat, lng });
-    updateGeofenceStatus(geofenceFound, { lat, lng });
+    const geocercaEncontrada = verificarGeocercas({ lat, lng });
+    actualizarEstadoGeocerca(geocercaEncontrada, { lat, lng });
     
-    if (!marker) {
-        createMarker(newLocation, userData);
+    if (!marcador) {
+        crearMarcador(nuevaUbicacion, datosUsuario);
     } else {
-        updateMarker(newLocation, userData);
+        actualizarMarcador(nuevaUbicacion, datosUsuario);
     }
     
-    updateStatus(`Dispositivo ${deviceId ? deviceId : 'desconocido'} - En línea`, 'connected');
+    cambiarEstado(`Dispositivo ${deviceId ? deviceId : 'desconocido'} - En línea`, 'connected');
 }
 
-function createMarker(location, userData) {
-    const { lat, lng, time, deviceId } = userData;
-    const el = document.createElement('div');
-    el.className = 'custom-marker';
+function crearMarcador(ubicacion, datosUsuario) {
+    const { lat, lng, time, deviceId } = datosUsuario;
+    const elemento = document.createElement('div');
+    elemento.className = 'custom-marker';
     
-    // Crear marcador personalizado
-    el.innerHTML = `
+    elemento.innerHTML = `
         <div class="marker-pulse"></div>
         <div class="marker-icon"></div>
     `;
 
-    marker = new mapboxgl.Marker(el)
-        .setLngLat(location)
+    marcador = new mapboxgl.Marker(elemento)
+        .setLngLat(ubicacion)
         .setPopup(new mapboxgl.Popup({ offset: 25 })
             .setHTML(`
                 <div class="popup-content">
@@ -561,60 +506,60 @@ function createMarker(location, userData) {
                     <p><strong>Latitud:</strong> ${lat.toFixed(6)}</p>
                     <p><strong>Longitud:</strong> ${lng.toFixed(6)}</p>
                     <p><strong>Hora:</strong> ${time || 'No disponible'}</p>
-                    <p><strong>Geocerca actual:</strong> ${currentGeofence ? currentGeofence.name : 'ninguna'}</p>
+                    <p><strong>Geocerca actual:</strong> ${geocercaActual ? geocercaActual.nombre : 'ninguna'}</p>
                 </div>
             `))
-        .addTo(map);
+        .addTo(mapa);
 
-    map.flyTo({
-        center: location,
+    mapa.flyTo({
+        center: ubicacion,
         zoom: 16,
         essential: true
     });
     
-    console.log('Marcador personalizado creado en:', location);
+    console.log('Marcador personalizado creado en:', ubicacion);
 }
 
-function updateMarker(location, userData) {
-    const { lat, lng, time, deviceId } = userData;
+function actualizarMarcador(ubicacion, datosUsuario) {
+    const { lat, lng, time, deviceId } = datosUsuario;
     
-    if (marker) {
-        marker.setLngLat(location);
+    if (marcador) {
+        marcador.setLngLat(ubicacion);
         
-        marker.getPopup().setHTML(`
+        marcador.getPopup().setHTML(`
             <div class="popup-content">
                 <h3>Dispositivo: ${deviceId || 'N/A'}</h3>
                 <p><strong>Latitud:</strong> ${lat.toFixed(6)}</p>
                 <p><strong>Longitud:</strong> ${lng.toFixed(6)}</p>
                 <p><strong>Hora:</strong> ${time || 'No disponible'}</p>
-                <p><strong>Geocerca actual:</strong> ${currentGeofence ? currentGeofence.name : 'ninguna'}</p>
+                <p><strong>Geocerca actual:</strong> ${geocercaActual ? geocercaActual.nombre : 'ninguna'}</p>
             </div>
         `);
         
-        console.log('Marcador actualizado en:', location);
+        console.log('Marcador actualizado en:', ubicacion);
     }
 }
 
-function updateLastUpdateTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('es-ES');
-    const lastUpdateElement = document.getElementById('lastUpdate');
-    if (lastUpdateElement) {
-        lastUpdateElement.textContent = `Última actualización: ${timeString}`;
+function actualizarUltimaActualizacion() {
+    const ahora = new Date();
+    const cadenaTiempo = ahora.toLocaleTimeString('es-ES');
+    const elementoUltimaActualizacion = document.getElementById('lastUpdate');
+    if (elementoUltimaActualizacion) {
+        elementoUltimaActualizacion.textContent = `Última actualización: ${cadenaTiempo}`;
     }
 }
 
-function updateGeofenceCount() {
-    const countElement = document.getElementById('geofenceCount');
-    if (countElement) {
-        countElement.textContent = geofences.length;
+function actualizarContadorGeocercas() {
+    const elementoContador = document.getElementById('geofenceCount');
+    if (elementoContador) {
+        elementoContador.textContent = geocercas.length;
     }
 }
 
-function centerMapOnLocation() {
-    if (lastLocation) {
-        map.flyTo({
-            center: [lastLocation.lng, lastLocation.lat],
+function centrarMapaEnUbicacion() {
+    if (ultimaUbicacion) {
+        mapa.flyTo({
+            center: [ultimaUbicacion.lng, ultimaUbicacion.lat],
             zoom: 17,
             essential: true
         });
@@ -631,18 +576,17 @@ function centerMapOnLocation() {
     }
 }
 
-// Agregar librería Toastify para notificaciones
-const toastifyScript = document.createElement('script');
-toastifyScript.src = 'https://cdn.jsdelivr.net/npm/toastify-js';
-document.head.appendChild(toastifyScript);
+const scriptToastify = document.createElement('script');
+scriptToastify.src = 'https://cdn.jsdelivr.net/npm/toastify-js';
+document.head.appendChild(scriptToastify);
 
-const toastifyCSS = document.createElement('link');
-toastifyCSS.rel = 'stylesheet';
-toastifyCSS.href = 'https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css';
-document.head.appendChild(toastifyCSS);
+const cssToastify = document.createElement('link');
+cssToastify.rel = 'stylesheet';
+cssToastify.href = 'https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css';
+document.head.appendChild(cssToastify);
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', iniciar);
 } else {
-    init();
+    iniciar();
 }
