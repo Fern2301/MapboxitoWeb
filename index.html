@@ -13,10 +13,11 @@
 <body>
     <div class="container">
         <header>
-            <h1>Map Box  Tracker</h1>
+            <h1>Map Box Tracker - Fernandito</h1>
             <div class="status">
                 <span id="status">Espere...</span>
                 <span id="lastUpdate"></span>
+                <span id="geofenceStatus">Fuera de geocercas</span>
             </div>
         </header>
 
@@ -28,11 +29,11 @@
 
         <div class="info-panel">
             <div class="info-card">
-                <h3>Informacion del Dispositivo</h3>
+                <h3>Información del Dispositivo</h3>
                 <div class="info-grid">
                     <div class="info-item">
                         <label>Dispositivo:</label>
-                        <span id="deviceId">Id del dispositivo</span>
+                        <span id="deviceId">Fernandito</span>
                     </div>
                     <div class="info-item">
                         <label>Latitud:</label>
@@ -50,8 +51,21 @@
                         <label>Estado:</label>
                         <span id="onlineStatus">-</span>
                     </div>
+                    <div class="info-item">
+                        <label>Geocerca actual:</label>
+                        <span id="currentGeofence">ninguna</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Geocercas cargadas:</label>
+                        <span id="geofenceCount">0</span>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Panel de control simplificado -->
+        <div class="control-panel">
+            <button id="btnCenterMap" class="control-btn">Centrar en Ubicación</button>
         </div>
     </div>
 
